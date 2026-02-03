@@ -29,7 +29,7 @@ app.use(bodyParser.json());
 // Routes
 
 app.use(cors({
-  origin: 'http://bus-istama.byethost7.com', // allow your frontend
+  origin: 'https://bus-istama.netlify.app', // allow your frontend
   credentials: true
 }));
 
