@@ -5,13 +5,13 @@ import express from "express";
 import cors from "cors";
 import bodyParser from "body-parser";
 
-import authRoutes from "../routes/authRoutes.js";
-import formulaRoutes from "../routes/formulaRoutes.js";
-import ticketRoutes from "../routes/ticketRoutes.js";
-import verifyRoutes from "../routes/verifyRoutes.js";
-import paymentRoutes from "../routes/paymentRoutes.js";
+import authRoutes from "./routes/authRoutes.js";
+import formulaRoutes from "./routes/formulaRoutes.js";
+import ticketRoutes from "./routes/ticketRoutes.js";
+import verifyRoutes from "./routes/verifyRoutes.js";
+import paymentRoutes from "./routes/paymentRoutes.js";
 
-import pool from "../config/db.js";
+import pool from "./config/db.js";
 
 const app = express();
 
