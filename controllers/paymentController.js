@@ -1,77 +1,85 @@
-import { getAccessToken } from "../utils/momo.js";
 import axios from "axios";
 import dotenv from "dotenv";
-import { v4 as uuidv4 } from "uuid";
-import { sendPaymentNotification } from "../utils/mailer.js";
-
 dotenv.config();
-
-const { MOMO_BASE_URL, MOMO_CONSUMER_KEY } = process.env;
 
 export const processPayment = async (req, res) => {
   const { phone, amount } = req.body;
 
-  try {
-    const token = await getAccessToken();
-    const referenceId = uuidv4();
+  const mtnPrefixes = ["67", "650", "651", "652", "653", "654", "680", "681", "682", "683", "684"];
+  const orangePrefixes = ["69", "655", "656", "657", "658", "659", "685", "686", "687", "688", "689"];
 
+  const prefix = phone?.replace(/^237/, "").substring(0, 2);
+  let operator = "CM_MTNMOBILEMONEY";
+  if (orangePrefixes.some(p => phone?.replace(/^237/, "").startsWith(p))) {
+    operator = "CM_ORANGEMONEY";
+  }
+
+  try {
     const paymentRequest = {
-      amount,
-      currency: "EUR", // or XAF if supported in production
-      externalId: referenceId,
-      payer: {
-        partyIdType: "MSISDN",
-        partyId: phone,
-      },
-      payerMessage: "Bus ticket payment",
-      payeeNote: "Smart Bus System",
+      service: "hX2MBNuuk7uj1giLmblYptxPqiDXfEUf",
+      phonenumber: phone,
+      amount: amount,
+      operator: operator,
+      currency: "XAF",
+      country: "CM",
     };
 
-    // Step 1: Initiate payment
-    await axios.post(`${MOMO_BASE_URL}/collection/v1_0/requesttopay`, paymentRequest, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "X-Reference-Id": referenceId,
-        "X-Target-Environment": "sandbox",
-        "Ocp-Apim-Subscription-Key": MOMO_CONSUMER_KEY,
-        "Content-Type": "application/json",
-      },
-    });
-
-    console.log("✅ Payment request sent for:", phone);
-
-    // Step 2: Check payment status
-    const statusResponse = await axios.get(
-      `${MOMO_BASE_URL}/collection/v1_0/requesttopay/${referenceId}`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "X-Target-Environment": "sandbox",
-          "Ocp-Apim-Subscription-Key": MOMO_CONSUMER_KEY,
-        },
-      }
+    const placeResponse = await axios.post(
+      "https://api.monetbil.com/payment/v1/placePayment",
+      paymentRequest,
+      { headers: { "Content-Type": "application/json" } }
     );
 
-   /* const status = statusResponse.data.status;
-    console.log("📡 Payment status:", status);
+    const { paymentId, status } = placeResponse.data; 
+    
+    if (status !== "REQUEST_ACCEPTED") {
+      return res.status(400).json({ message: "Payment initiation failed", status });
+    }
 
-    // Step 3: Notify owner if successful
-    if (status === "SUCCESSFUL") {
-      await sendPaymentNotification({ phone, amount, referenceId });
-    }*/
+    console.log("✅ Payment request sent for:", phone, "| paymentId:", paymentId);
 
-    res.status(200).json({
-      message: "Payment processed successfully",
-      phone,
-      amount,
-      referenceId,
-      /*status,*/
-    });
+    let transaction = null;
+    const maxAttempts = 10;
+
+    for (let i = 0; i < maxAttempts; i++) {
+      await new Promise(resolve => setTimeout(resolve, 5000));
+
+      const checkResponse = await axios.post(
+        "https://api.monetbil.com/payment/v1/checkPayment",
+        { paymentId },
+        { headers: { "Content-Type": "application/json" } } 
+      );
+
+      const checkData = checkResponse.data;
+      console.log(`🔄 Check attempt ${i + 1}:`, checkData.message);
+
+      if (checkData.message === "payment finish") {
+        transaction = checkData.transaction;
+        break;
+      }
+    }
+
+    if (!transaction) {
+      return res.status(202).json({ message: "Payment pending or timed out", paymentId });
+    }
+
+    if (transaction.status === 1) {
+      return res.status(200).json({
+        message: "Payment processed successfully",
+        phone,
+        amount,
+        paymentId,
+        transaction,
+      });
+    } else {
+      return res.status(400).json({
+        message: transaction.status === -1 ? "Payment cancelled" : "Payment failed",
+        transaction,
+      });
+    }
+
   } catch (err) {
     console.error("❌ Payment error:", err.message);
-    if (err.response) {
-      console.error("MoMo API error:", err.response.data);
-    }
     res.status(500).json({
       message: "Payment failed",
       error: err.message,
