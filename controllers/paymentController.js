@@ -46,8 +46,8 @@ export const processPayment = async (req, res) => {
 
       const checkResponse = await axios.post(
         "https://api.monetbil.com/payment/v1/checkPayment",
-        { paymentId },
-        { headers: { "Content-Type": "application/json" } } 
+        new URLSearchParams({ paymentId: String(paymentId) }), // form-encoded
+        { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
       );
 
       const checkData = checkResponse.data;
