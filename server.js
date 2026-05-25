@@ -1,39 +1,22 @@
+import dotenv from "dotenv";
+dotenv.config();
+
 import express from "express";
 import cors from "cors";
 import bodyParser from "body-parser";
-
 import authRoutes from "./routes/authRoutes.js";
 import formulaRoutes from "./routes/formulaRoutes.js";
 import ticketRoutes from "./routes/ticketRoutes.js";
 import verifyRoutes from "./routes/verifyRoutes.js";
 import paymentRoutes from "./routes/paymentRoutes.js";
-
 import pool from "./config/db.js";
 
 const app = express();
 
-// ✅ Updated CORS to support multiple origins (Vercel, Netlify, localhost)
-const allowedOrigins = [
-  'https://bus-istama.netlify.app',
-  process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000',
-  'http://localhost:3000',
-  'http://localhost:5173'
-];
-
-app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  credentials: true
-}));
-
+app.use(cors());
 app.use(bodyParser.json());
 
-// DB test (runs on cold start)
+// MySQL Connection Test
 (async () => {
   try {
     await pool.query("SELECT 1");
@@ -43,17 +26,19 @@ app.use(bodyParser.json());
   }
 })();
 
-// ⚠️ Routes
-app.use("/auth", authRoutes);
-app.use("/formulas", formulaRoutes);
-app.use("/tickets", ticketRoutes);
-app.use("/scan", verifyRoutes);
-app.use("/payments", paymentRoutes);
+// Routes
 
-// ✅ Health check endpoint for Vercel
-app.get('/api/health', (req, res) => {
-  res.status(200).json({ status: 'ok' });
-});
+app.use(cors({
+  origin: 'https://bus-istama.netlify.app', // allow your frontend
+  credentials: true
+}));
 
-// ✅ EXPORT for Vercel serverless functions
-export default app;
+app.use("/api/auth", authRoutes);
+app.use("/api/formulas", formulaRoutes);
+app.use("/api/tickets", ticketRoutes);
+app.use("/api/scan", verifyRoutes);
+app.use("/api/payments", paymentRoutes);
+
+// Server
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
