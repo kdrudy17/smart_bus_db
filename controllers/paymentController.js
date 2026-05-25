@@ -63,7 +63,7 @@ export const processPayment = async (req, res) => {
       return res.status(202).json({ message: "Payment pending or timed out", paymentId });
     }
 
-    if (transaction.status === 1) {
+    if (transaction.status == 1) {
       return res.status(200).json({
         message: "Payment processed successfully",
         phone,
